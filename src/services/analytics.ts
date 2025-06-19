@@ -1,6 +1,6 @@
 export interface AnalyticsEvent {
   event: string;
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
   timestamp: Date;
   userId?: string;
   sessionId: string;
@@ -135,7 +135,7 @@ class AnalyticsService {
     return this.isAuthorizedUser;
   }
 
-  track(event: string, properties: Record<string, any> = {}) {
+  track(event: string, properties: Record<string, unknown> = {}) {
     // Always track basic events for functionality, but only store/send detailed analytics for authorized user
     const shouldTrackDetailed = this.isAnalyticsEnabled();
 
@@ -239,7 +239,7 @@ class AnalyticsService {
   }
 
   // User Journey Tracking
-  trackUserJourney(step: string, metadata: Record<string, any> = {}) {
+  trackUserJourney(step: string, metadata: Record<string, unknown> = {}) {
     this.track("user_journey", {
       step,
       ...metadata,
@@ -249,7 +249,7 @@ class AnalyticsService {
   // Authentication Events
   trackAuthentication(
     action: "login_attempt" | "login_success" | "login_failure" | "logout",
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ) {
     this.track(`auth_${action}`, {
       ...metadata,
@@ -264,7 +264,7 @@ class AnalyticsService {
       | "command_executed"
       | "command_failed"
       | "command_blocked",
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ) {
     this.track(`ai_command_${action}`, {
       ...metadata,
@@ -280,7 +280,7 @@ class AnalyticsService {
       | "connection_failure"
       | "disconnection",
     appId: string,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ) {
     this.track(`app_${action}`, {
       appId,
@@ -296,7 +296,7 @@ class AnalyticsService {
       | "document_edited"
       | "document_created"
       | "document_shared",
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ) {
     this.track(`document_${action}`, {
       ...metadata,
@@ -308,7 +308,7 @@ class AnalyticsService {
   trackFeatureUsage(
     feature: string,
     action: string,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ) {
     this.track("feature_usage", {
       feature,
@@ -322,7 +322,7 @@ class AnalyticsService {
   trackPerformance(
     metric: string,
     value: number,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ) {
     this.track("performance_metric", {
       metric,
@@ -336,7 +336,7 @@ class AnalyticsService {
   trackError(
     error: Error,
     context: string,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ) {
     this.track("error_occurred", {
       errorMessage: error.message,
@@ -354,7 +354,7 @@ class AnalyticsService {
       | "feature_discovery"
       | "user_retention"
       | "subscription_upgrade",
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ) {
     this.track(`business_${event}`, {
       ...metadata,
@@ -377,9 +377,9 @@ class AnalyticsService {
     const commandEvents = this.events.filter((e) =>
       e.event.startsWith("ai_command_")
     );
-    const connectionEvents = this.events.filter((e) =>
-      e.event.startsWith("app_")
-    );
+    // const connectionEvents = this.events.filter((e) =>
+    //   e.event.startsWith("app_")
+    // );
     const documentEvents = this.events.filter((e) =>
       e.event.startsWith("document_")
     );
@@ -470,8 +470,8 @@ export const analytics = new AnalyticsService();
 // Type declarations for external analytics services
 declare global {
   interface Window {
-    gtag?: (...args: any[]) => void;
-    mixpanel?: any;
-    posthog?: any;
+    gtag?: (...args: unknown[]) => void;
+    mixpanel?: unknown;
+    posthog?: unknown;
   }
 }

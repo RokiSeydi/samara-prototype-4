@@ -11,7 +11,7 @@ export const useGraphData = () => {
   const [accountType, setAccountType] = useState<
     "personal" | "business" | "unknown"
   >("unknown");
-  const [debugInfo, setDebugInfo] = useState<unknown>(null);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   const callMsGraph = async (endpoint: string) => {
     const account = accounts[0];
@@ -39,71 +39,207 @@ export const useGraphData = () => {
     return fetchResponse;
   };
 
-  // Try the most promising endpoints first
-  const tryPriorityEndpoints = async () => {
-    console.log("🎯 Trying priority file endpoints...");
+  // Enhanced endpoint testing specifically for Business Standard accounts
+  const tryBusinessStandardEndpoints = async () => {
+    console.log("🏢 Testing Business Standard account endpoints...");
 
-    const priorityEndpoints = [
-      // Most likely to work for business accounts
+    const businessEndpoints = [
+      // Primary OneDrive access methods
       {
-        name: "Drive Root Children",
-        endpoint: "https://graph.microsoft.com/v1.0/me/drive/root/children",
-        description: "Standard OneDrive files",
+        name: "OneDrive Personal",
+        endpoint:
+          "https://graph.microsoft.com/v1.0/me/drive/root/children?$top=25",
+        description: "Personal OneDrive files",
       },
       {
-        name: "Drive Recent",
-        endpoint: "https://graph.microsoft.com/v1.0/me/drive/recent",
+        name: "OneDrive Recent",
+        endpoint: "https://graph.microsoft.com/v1.0/me/drive/recent?$top=25",
         description: "Recently accessed files",
       },
+      // Alternative drive access
       {
-        name: "Search Office Files",
+        name: "All Drives",
+        endpoint: "https://graph.microsoft.com/v1.0/me/drives",
+        description: "Available drives",
+      },
+      // SharePoint integration
+      {
+        name: "SharePoint Root",
+        endpoint: "https://graph.microsoft.com/v1.0/sites/root",
+        description: "SharePoint root site",
+      },
+      {
+        name: "SharePoint Sites",
+        endpoint: "https://graph.microsoft.com/v1.0/sites?search=*",
+        description: "SharePoint sites",
+      },
+      // Office 365 Groups and Teams
+      {
+        name: "Office 365 Groups",
         endpoint:
-          "https://graph.microsoft.com/v1.0/me/drive/root/search(q='.docx OR .xlsx OR .pptx')?$top=25",
-        description: "Search for Office documents",
+          "https://graph.microsoft.com/v1.0/me/memberOf/microsoft.graph.group",
+        description: "Office 365 Groups",
       },
+      // Insights API for recent Office files
       {
-        name: "Insights Used",
+        name: "Office Insights Used",
         endpoint: "https://graph.microsoft.com/v1.0/me/insights/used?$top=25",
-        description: "Recently used documents",
+        description: "Recently used Office files",
       },
       {
-        name: "Insights Trending",
+        name: "Office Insights Trending",
         endpoint:
           "https://graph.microsoft.com/v1.0/me/insights/trending?$top=25",
-        description: "Trending documents",
+        description: "Trending Office files",
+      },
+      // Alternative file access methods
+      {
+        name: "Shared Files",
+        endpoint:
+          "https://graph.microsoft.com/v1.0/me/drive/sharedWithMe?$top=25",
+        description: "Files shared with me",
       },
     ];
 
-    for (const endpoint of priorityEndpoints) {
+    const results = {
+      accessible: [],
+      failed: [],
+      fileData: null,
+    };
+
+    for (const endpoint of businessEndpoints) {
       try {
-        console.log(`🎯 Testing: ${endpoint.name} (${endpoint.description})`);
+        console.log(`🔍 Testing: ${endpoint.name}`);
         const response = await callMsGraph(endpoint.endpoint);
         const data = await response.json();
 
         if (response.ok && !data.error) {
-          const itemCount = data.value?.length || 0;
+          const itemCount = data.value?.length || (data.id ? 1 : 0);
           console.log(
             `✅ ${endpoint.name}: SUCCESS - Found ${itemCount} items`
           );
 
-          if (itemCount > 0) {
+          results.accessible.push({
+            ...endpoint,
+            data: data,
+            itemCount,
+            status: "success",
+          });
+
+          // Try to extract Office files from successful endpoints
+          if (
+            endpoint.name === "OneDrive Personal" ||
+            endpoint.name === "OneDrive Recent"
+          ) {
+            if (data.value && data.value.length > 0) {
+              console.log(
+                `📁 Found ${data.value.length} files in ${endpoint.name}`
+              );
+              results.fileData = { data: data.value, source: endpoint.name };
+            }
+          }
+
+          // Handle All Drives endpoint
+          if (endpoint.name === "All Drives" && data.value) {
+            for (const drive of data.value.slice(0, 3)) {
+              // Try first 3 drives
+              try {
+                console.log(`💾 Checking drive: ${drive.name || drive.id}`);
+                const driveFilesResponse = await callMsGraph(
+                  `https://graph.microsoft.com/v1.0/drives/${drive.id}/root/children?$top=25`
+                );
+                const driveFilesData = await driveFilesResponse.json();
+
+                if (
+                  driveFilesResponse.ok &&
+                  driveFilesData.value &&
+                  driveFilesData.value.length > 0
+                ) {
+                  console.log(
+                    `✅ Found ${driveFilesData.value.length} files in drive ${drive.name}`
+                  );
+                  results.fileData = {
+                    data: driveFilesData.value,
+                    source: `Drive: ${drive.name || drive.id}`,
+                  };
+                  break; // Use first successful drive
+                }
+              } catch (error) {
+                console.log(`❌ Drive ${drive.name} failed:`, error.message);
+              }
+            }
+          }
+
+          // Handle SharePoint sites
+          if (
+            endpoint.name === "SharePoint Sites" &&
+            data.value &&
+            data.value.length > 0
+          ) {
+            for (const site of data.value.slice(0, 2)) {
+              // Try first 2 sites
+              try {
+                console.log(`🏢 Checking SharePoint site: ${site.displayName}`);
+                const siteDocsResponse = await callMsGraph(
+                  `https://graph.microsoft.com/v1.0/sites/${site.id}/drive/root/children?$top=25`
+                );
+                const siteDocsData = await siteDocsResponse.json();
+
+                if (
+                  siteDocsResponse.ok &&
+                  siteDocsData.value &&
+                  siteDocsData.value.length > 0
+                ) {
+                  console.log(
+                    `✅ Found ${siteDocsData.value.length} files in SharePoint site ${site.displayName}`
+                  );
+                  results.fileData = {
+                    data: siteDocsData.value,
+                    source: `SharePoint: ${site.displayName}`,
+                  };
+                  break; // Use first successful site
+                }
+              } catch (error) {
+                console.log(
+                  `❌ SharePoint site ${site.displayName} failed:`,
+                  error.message
+                );
+              }
+            }
+          }
+
+          // Handle Office Insights
+          if (
+            (endpoint.name === "Office Insights Used" ||
+              endpoint.name === "Office Insights Trending") &&
+            data.value &&
+            data.value.length > 0
+          ) {
             console.log(
-              "📄 Sample items:",
-              data.value
-                .slice(0, 3)
-                .map(
-                  (f: {
-                    name: unknown;
-                    resourceVisualization: { title: unknown };
-                  }) => f.name || f.resourceVisualization?.title
-                )
+              `✅ Found ${data.value.length} recent Office files via ${endpoint.name}`
             );
-            return {
-              success: true,
-              data: data.value,
-              source: endpoint.name,
-              endpoint: endpoint.endpoint,
-            };
+            const insightFiles = data.value
+              .filter(
+                (item) =>
+                  item.resourceVisualization && item.resourceVisualization.type
+              )
+              .map((item) => ({
+                id: item.id,
+                name: item.resourceVisualization.title,
+                lastModifiedDateTime:
+                  item.lastUsed?.lastAccessedDateTime ||
+                  new Date().toISOString(),
+                size: 0, // Not available in insights
+                webUrl: item.resourceReference?.webUrl || "#",
+                file: { mimeType: item.resourceVisualization.type },
+              }));
+
+            if (insightFiles.length > 0 && !results.fileData) {
+              results.fileData = {
+                data: insightFiles,
+                source: endpoint.name,
+              };
+            }
           }
         } else {
           console.log(
@@ -111,167 +247,35 @@ export const useGraphData = () => {
               data.error?.message || response.statusText
             }`
           );
-
-          // Log specific error details for debugging
-          if (data.error) {
-            console.log(`   Error Code: ${data.error.code}`);
-            console.log(`   Error Message: ${data.error.message}`);
-            if (data.error.innerError) {
-              console.log(
-                `   Inner Error: ${JSON.stringify(data.error.innerError)}`
-              );
-            }
-          }
+          results.failed.push({
+            ...endpoint,
+            error: data.error?.message || response.statusText,
+            errorCode: data.error?.code || response.status,
+            status: "failed",
+          });
         }
       } catch (error) {
         console.log(`❌ ${endpoint.name}: NETWORK ERROR`, error.message);
+        results.failed.push({
+          ...endpoint,
+          error: error.message,
+          errorCode: "NETWORK_ERROR",
+          status: "error",
+        });
       }
     }
 
-    return { success: false };
+    console.log("📊 BUSINESS STANDARD ACCOUNT SUMMARY:");
+    console.log(`✅ Accessible endpoints: ${results.accessible.length}`);
+    console.log(`❌ Failed endpoints: ${results.failed.length}`);
+    console.log(`📁 File data found: ${results.fileData ? "Yes" : "No"}`);
+
+    return results;
   };
 
-  // Try SharePoint and Teams as backup
-  const tryCollaborationEndpoints = async () => {
-    console.log("🤝 Trying collaboration endpoints...");
-
-    const collabEndpoints = [
-      {
-        name: "SharePoint Sites",
-        endpoint: "https://graph.microsoft.com/v1.0/sites?search=*&$top=10",
-        description: "SharePoint sites you have access to",
-      },
-      {
-        name: "Joined Teams",
-        endpoint: "https://graph.microsoft.com/v1.0/me/joinedTeams",
-        description: "Teams you are a member of",
-      },
-      {
-        name: "Group Memberships",
-        endpoint: "https://graph.microsoft.com/v1.0/me/memberOf?$top=10",
-        description: "Groups and teams you belong to",
-      },
-    ];
-
-    for (const endpoint of collabEndpoints) {
-      try {
-        console.log(`🤝 Testing: ${endpoint.name}`);
-        const response = await callMsGraph(endpoint.endpoint);
-        const data = await response.json();
-
-        if (response.ok && !data.error && data.value && data.value.length > 0) {
-          console.log(
-            `✅ ${endpoint.name}: SUCCESS - Found ${data.value.length} items`
-          );
-
-          // Try to get files from these sources
-          if (endpoint.name === "SharePoint Sites") {
-            for (const site of data.value.slice(0, 2)) {
-              try {
-                console.log(
-                  `   🔍 Checking site: ${site.displayName || site.name}`
-                );
-                const siteFilesResponse = await callMsGraph(
-                  `https://graph.microsoft.com/v1.0/sites/${site.id}/drive/root/children?$top=25`
-                );
-                const siteFilesData = await siteFilesResponse.json();
-
-                if (
-                  siteFilesResponse.ok &&
-                  siteFilesData.value &&
-                  siteFilesData.value.length > 0
-                ) {
-                  console.log(
-                    `   ✅ Found ${siteFilesData.value.length} files in ${site.displayName}`
-                  );
-                  return {
-                    success: true,
-                    data: siteFilesData.value,
-                    source: `SharePoint: ${site.displayName}`,
-                  };
-                }
-              } catch (error) {
-                console.log(
-                  `   ❌ Site ${site.displayName} failed:`,
-                  error.message
-                );
-              }
-            }
-          }
-
-          if (endpoint.name === "Joined Teams") {
-            for (const team of data.value.slice(0, 2)) {
-              try {
-                console.log(`   🔍 Checking team: ${team.displayName}`);
-                const teamFilesResponse = await callMsGraph(
-                  `https://graph.microsoft.com/v1.0/teams/${team.id}/channels?$expand=filesFolder`
-                );
-                const teamFilesData = await teamFilesResponse.json();
-
-                if (teamFilesResponse.ok && teamFilesData.value) {
-                  console.log(
-                    `   ✅ Found team channels for ${team.displayName}`
-                  );
-                  // Could explore team files further here
-                }
-              } catch (error) {
-                console.log(
-                  `   ❌ Team ${team.displayName} failed:`,
-                  error.message
-                );
-              }
-            }
-          }
-
-          if (endpoint.name === "Group Memberships") {
-            for (const group of data.value.slice(0, 2)) {
-              if (group["@odata.type"] === "#microsoft.graph.group") {
-                try {
-                  console.log(`   🔍 Checking group: ${group.displayName}`);
-                  const groupFilesResponse = await callMsGraph(
-                    `https://graph.microsoft.com/v1.0/groups/${group.id}/drive/root/children?$top=25`
-                  );
-                  const groupFilesData = await groupFilesResponse.json();
-
-                  if (
-                    groupFilesResponse.ok &&
-                    groupFilesData.value &&
-                    groupFilesData.value.length > 0
-                  ) {
-                    console.log(
-                      `   ✅ Found ${groupFilesData.value.length} files in group ${group.displayName}`
-                    );
-                    return {
-                      success: true,
-                      data: groupFilesData.value,
-                      source: `Group: ${group.displayName}`,
-                    };
-                  }
-                } catch (error) {
-                  console.log(
-                    `   ❌ Group ${group.displayName} failed:`,
-                    error.message
-                  );
-                }
-              }
-            }
-          }
-        } else {
-          console.log(
-            `❌ ${endpoint.name}: FAILED - ${data.error?.message || "No data"}`
-          );
-        }
-      } catch (error) {
-        console.log(`❌ ${endpoint.name}: ERROR`, error.message);
-      }
-    }
-
-    return { success: false };
-  };
-
-  const debugAccountAndPermissions = async () => {
+  const diagnoseBusinessAccount = async () => {
     try {
-      console.log("🔍 Starting targeted file access debugging...");
+      console.log("🔍 Diagnosing Business Standard account...");
 
       // First, verify basic access
       console.log("👤 Verifying basic account access...");
@@ -292,53 +296,132 @@ export const useGraphData = () => {
         userData.mail || userData.userPrincipalName
       );
 
-      // Try priority endpoints first
-      const priorityResult = await tryPriorityEndpoints();
+      // Check subscription and license info
+      console.log("📋 Checking subscription information...");
+      try {
+        const subscriptionResponse = await callMsGraph(
+          "https://graph.microsoft.com/v1.0/me/licenseDetails"
+        );
+        const subscriptionData = await subscriptionResponse.json();
 
-      if (priorityResult.success) {
+        if (subscriptionResponse.ok && subscriptionData.value) {
+          console.log(
+            "📋 License information:",
+            subscriptionData.value.map((license) => license.skuPartNumber)
+          );
+        }
+      } catch (error) {
+        console.log(
+          "⚠️ Could not retrieve license information:",
+          error.message
+        );
+      }
+
+      // Check what Microsoft 365 services are available
+      console.log("🔍 Checking available Microsoft 365 services...");
+      const serviceEndpoints = [
+        {
+          name: "Mail",
+          endpoint: "https://graph.microsoft.com/v1.0/me/mailboxSettings",
+        },
+        {
+          name: "Calendar",
+          endpoint: "https://graph.microsoft.com/v1.0/me/calendar",
+        },
+        {
+          name: "Contacts",
+          endpoint: "https://graph.microsoft.com/v1.0/me/contacts?$top=1",
+        },
+        {
+          name: "Tasks",
+          endpoint: "https://graph.microsoft.com/v1.0/me/todo/lists?$top=1",
+        },
+        {
+          name: "Planner",
+          endpoint: "https://graph.microsoft.com/v1.0/me/planner/tasks?$top=1",
+        },
+      ];
+
+      const availableServices = [];
+      for (const service of serviceEndpoints) {
+        try {
+          const response = await callMsGraph(service.endpoint);
+          const data = await response.json();
+          if (response.ok && !data.error) {
+            availableServices.push(service.name);
+            console.log(`✅ ${service.name} service available`);
+          } else {
+            console.log(
+              `❌ ${service.name} service unavailable: ${data.error?.message}`
+            );
+          }
+        } catch (error) {
+          console.log(`❌ ${service.name} service error:`, error.message);
+        }
+      }
+
+      console.log("📊 Available services:", availableServices);
+
+      // Try Business Standard file access methods
+      const businessResults = await tryBusinessStandardEndpoints();
+
+      if (businessResults.fileData) {
+        console.log("🎉 SUCCESS: Found file access method!");
         return {
           success: true,
-          fileResult: priorityResult,
+          fileResult: businessResults.fileData,
           userData,
-          method: "priority_endpoints",
+          availableServices,
+          accessibleEndpoints: businessResults.accessible,
+          failedEndpoints: businessResults.failed,
+          method: "business_standard_access",
         };
       }
 
-      // If priority endpoints fail, try collaboration endpoints
+      // Provide detailed diagnosis for Business Standard accounts
+      console.log("📊 BUSINESS STANDARD DIAGNOSIS:");
       console.log(
-        "🔄 Priority endpoints failed, trying collaboration sources..."
+        "❌ File access blocked - this is common for corporate accounts"
       );
-      const collabResult = await tryCollaborationEndpoints();
-
-      if (collabResult.success) {
-        return {
-          success: true,
-          fileResult: collabResult,
-          userData,
-          method: "collaboration_endpoints",
-        };
-      }
-
-      // If everything fails, provide detailed diagnosis
-      console.log("📊 DIAGNOSIS: No file access found through any method");
-      console.log("💡 This could mean:");
-      console.log("   1. Your account has no Office documents");
-      console.log("   2. OneDrive is not enabled for your account");
-      console.log("   3. Additional permissions are needed");
-      console.log("   4. Files are stored in a location we haven't checked");
+      console.log("✅ Available services:", availableServices.join(", "));
+      console.log("💡 BUSINESS STANDARD RECOMMENDATIONS:");
+      console.log(
+        "   1. Your IT admin may have restricted third-party app file access"
+      );
+      console.log(
+        "   2. OneDrive for Business may require additional permissions"
+      );
+      console.log(
+        "   3. SharePoint access might be limited by organizational policies"
+      );
+      console.log(
+        "   4. Demo mode shows all features working with realistic data"
+      );
+      console.log(
+        "   5. Priority Dashboard will work with available services (Mail, Calendar, Tasks)"
+      );
+      console.log(
+        '   6. Contact IT to enable "Files.Read" and "Sites.Read.All" permissions'
+      );
 
       return {
         success: false,
         userData,
-        diagnosis: "no_file_access",
-        suggestions: [
-          "Try creating a test document in OneDrive",
-          "Check if OneDrive is enabled for your account",
-          "Verify you have the necessary licenses",
+        availableServices,
+        accessibleEndpoints: businessResults.accessible,
+        failedEndpoints: businessResults.failed,
+        diagnosis: "business_standard_file_restrictions",
+        recommendations: [
+          "Contact IT admin to enable third-party app file access",
+          'Request "Files.Read" and "Sites.Read.All" Microsoft Graph permissions',
+          "Verify OneDrive for Business is enabled for your account",
+          "Check if SharePoint Online access is restricted by policy",
+          "Use demo mode to test all functionality with sample data",
+          "Priority Dashboard works with Mail, Calendar, and Tasks regardless",
         ],
       };
     } catch (error) {
-      console.error("🚨 Debug failed:", error);
+      console.error("🚨 Business Standard diagnosis failed:", error);
       return { success: false, error: error.message };
     }
   };
@@ -531,13 +614,13 @@ export const useGraphData = () => {
     setError(null);
 
     try {
-      console.log("🚀 Starting targeted document fetch...");
+      console.log("🚀 Starting Business Standard account document fetch...");
 
       // Step 1: Detect account type
       await detectAccountType();
 
-      // Step 2: Run targeted debugging
-      const debugResult = await debugAccountAndPermissions();
+      // Step 2: Run Business Standard diagnosis
+      const debugResult = await diagnoseBusinessAccount();
       setDebugInfo(debugResult);
 
       if (
@@ -603,11 +686,13 @@ export const useGraphData = () => {
           setError("NO_DOCUMENTS_FOUND");
         }
       } else {
-        console.log("ℹ️ No file access found - using demo documents");
+        console.log(
+          "ℹ️ Using demo documents - Business Standard account with file access restrictions"
+        );
         setDocuments(createDemoDocuments());
 
-        if (debugResult.diagnosis === "no_file_access") {
-          setError("NO_FILE_ACCESS");
+        if (debugResult.diagnosis === "business_standard_file_restrictions") {
+          setError("BUSINESS_STANDARD_RESTRICTED");
         } else {
           setError("API_ERROR");
         }
@@ -615,7 +700,7 @@ export const useGraphData = () => {
     } catch (err) {
       console.error("🚨 Error in fetchDocuments:", err);
       setDocuments(createDemoDocuments());
-      setError("API_ERROR");
+      setError("BUSINESS_STANDARD_RESTRICTED");
     } finally {
       setLoading(false);
     }

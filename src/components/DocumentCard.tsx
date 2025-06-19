@@ -64,7 +64,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
         height: isZoomed ? "400px" : "200px",
         width: isZoomed ? "350px" : "250px",
       }}
-      onClick={onClick}
+      {...{ onClick: onClick }}
     >
       <Card
         style={{

@@ -80,7 +80,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const getStatusIcon = (status: AICommand["status"]) => {
     switch (status) {
       case "processing":
-        return <ArrowSyncRegular size="tiny" />;
+        return <ArrowSyncRegular style={{ fontSize: "14px" }} />;
       case "completed":
         return <CheckmarkCircleRegular style={{ color: "#107C10" }} />;
       case "error":

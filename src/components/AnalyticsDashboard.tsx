@@ -42,6 +42,12 @@ interface MetricCard {
   description?: string;
 }
 
+interface AuthStatus {
+  canViewAnalytics: boolean;
+  userEmail?: string;
+  // Add other properties if needed
+}
+
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   isOpen,
   onClose,
@@ -51,7 +57,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   );
   const [recentEvents, setRecentEvents] = useState<AnalyticsEvent[]>([]);
   const [isDebugMode, setIsDebugMode] = useState(false);
-  const [authStatus, setAuthStatus] = useState<unknown>(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
 
   useEffect(() => {
     if (isOpen) {

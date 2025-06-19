@@ -535,7 +535,8 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
   // Use real documents when available, fallback to mock data
   const recentItems = getRealDocumentsForApp();
   const fallbackItems = getMockPreviewData(app.type);
-  const displayItems = recentItems.length > 0 ? recentItems : fallbackItems;
+  const displayItems =
+    (recentItems.length > 0 ? recentItems : fallbackItems) || [];
   const appSummary = getAppSummary() || app.summary;
 
   return (
@@ -554,7 +555,7 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
         cursor: isMinimized ? "pointer" : "default",
         position: "relative",
       }}
-      onClick={handleCardClick}
+      {...{ onClick: handleCardClick }}
     >
       {showDataFlow && (
         <motion.div
@@ -696,7 +697,7 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
                       appearance="subtle"
                       size="small"
                       icon={<DismissRegular />}
-                      onClick={(e) => {
+                      onClick={(e: { stopPropagation: () => void }) => {
                         e.stopPropagation();
                         handleCloseEmbeddedDocument();
                       }}
@@ -908,9 +909,9 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
                           transition: "all 0.3s ease",
                           cursor: "pointer",
                         }}
-                        onClick={(e) =>
-                          handleDocumentClick(item.id, item.name, e)
-                        }
+                        onClick={(
+                          e: React.MouseEvent<HTMLDivElement, MouseEvent>
+                        ) => handleDocumentClick(item.id, item.name, e)}
                         whileHover={{ scale: 1.02 }}
                       >
                         <div style={{ flex: 1 }}>
@@ -976,7 +977,7 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
               appearance="subtle"
               size="small"
               icon={<MaximizeRegular />}
-              onClick={(e) => {
+              onClick={(e: { stopPropagation: () => void }) => {
                 e.stopPropagation();
                 onToggleSize();
               }}
@@ -988,7 +989,7 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
               appearance="primary"
               size="small"
               icon={<OpenRegular />}
-              onClick={(e) => {
+              onClick={(e: { stopPropagation: () => void }) => {
                 e.stopPropagation();
                 onOpenInTab();
               }}
