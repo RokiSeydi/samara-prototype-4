@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
 import {
   Card,
@@ -114,6 +115,7 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
         "https://graph.microsoft.com/v1.0/me/messages?$top=10&$filter=importance eq 'high' or flag/flagStatus eq 'flagged'&$orderby=receivedDateTime desc"
       );
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       emails.value?.forEach((email: any) => {
         priorities.push({
           id: `email-${email.id}`,
@@ -142,6 +144,7 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
         `https://graph.microsoft.com/v1.0/me/events?$filter=start/dateTime ge '${today.toISOString()}' and start/dateTime lt '${tomorrow.toISOString()}'&$orderby=start/dateTime`
       );
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       events.value?.forEach((event: any) => {
         const startTime = new Date(event.start.dateTime);
         const isUpcoming =
@@ -232,8 +235,8 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
           app: "planner",
           priority: isOverdue ? "high" : isDueSoon ? "medium" : "low",
           type: "task",
-          actionRequired: isOverdue || isDueSoon,
-          dueDate: dueDate,
+          actionRequired: Boolean(isOverdue || isDueSoon),
+          ...(dueDate ? { dueDate } : {}),
           isCollaborative: true,
         });
       });
@@ -540,8 +543,17 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
     }
   };
 
-  const getAppColor = (app: string) => {
-    const colors = {
+  type AppKey =
+    | "outlook"
+    | "teams"
+    | "excel"
+    | "word"
+    | "powerpoint"
+    | "onenote"
+    | "planner";
+
+  const getAppColor = (app: AppKey | string) => {
+    const colors: Record<AppKey, string> = {
       outlook: "#0078D4",
       teams: "#6264A7",
       excel: "#107C41",
@@ -550,7 +562,7 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
       onenote: "#7719AA",
       planner: "#0078D4",
     };
-    return colors[app] || "#605E5C";
+    return colors[app as AppKey] || "#605E5C";
   };
 
   const getPriorityIcon = (priority: string, actionRequired: boolean) => {
@@ -958,11 +970,12 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
                                   {(item.participants || item.sharedWith)
                                     ?.slice(0, 2)
                                     .join(", ")}
-                                  {(item.participants || item.sharedWith)
-                                    ?.length > 2 &&
+
+                                  {((item.participants || item.sharedWith)
+                                    ?.length ?? 0) > 2 &&
                                     ` +${
-                                      (item.participants || item.sharedWith)
-                                        .length - 2
+                                      ((item.participants || item.sharedWith)
+                                        ?.length ?? 0) - 2
                                     } more`}
                                 </Text>
                               </div>

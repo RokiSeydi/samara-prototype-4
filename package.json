@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build --force",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -14,14 +14,15 @@
     "@azure/msal-react": "^2.0.9",
     "@fluentui/react-components": "^9.44.0",
     "@fluentui/react-icons": "^2.0.239",
+    "@types/node": "^24.0.3",
     "framer-motion": "^10.16.16",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "web-vitals": "^3.5.0"
+    "web-vitals": "^3.5.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.28.0",
-    "@types/node": "^24.0.3",
     "@types/react": "^19.1.7",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.5.2",

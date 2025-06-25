@@ -21,10 +21,12 @@ import {
   PlugConnectedRegular,
   EditRegular,
   DismissRegular,
+  ArrowSwapRegular,
 } from "@fluentui/react-icons";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { EmbeddedDocumentEditor } from "./EmbeddedDocumentEditor";
 import { useGraphData } from "../hooks/useGraphData";
+import { ExcelComparison } from "./ExcelComparison";
 
 interface AppWidgetData {
   id: string;
@@ -214,6 +216,7 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
     id: string;
     name: string;
   } | null>(null);
+  const [showExcelComparison, setShowExcelComparison] = useState(false);
 
   // Get real documents from Graph API
   const { documents, loading: documentsLoading } = useGraphData();
@@ -267,6 +270,11 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
   const handleSaveDocument = (content: string) => {
     console.log("Document saved:", content);
     // In real implementation, this would save to Microsoft Graph API
+  };
+
+  const handleExcelComparison = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    setShowExcelComparison(true);
   };
 
   const getHighlightStyles = () => {
@@ -421,19 +429,19 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
               justifyContent: "space-between",
               alignItems: "center",
               textAlign: "center",
-              // minHeight: "200px",
+              //minHeight: "200px",
             }}
           >
-            {/* <div style={{ marginBottom: "20px", width: "100%" }}>
-              <PlugConnectedRegular
+            <div style={{ marginBottom: "20px", width: "100%" }}>
+              {/* <PlugConnectedRegular
                 style={{
                   fontSize: "32px",
                   color: "#C8C6C4",
                   marginBottom: "12px",
                   display: "block",
                 }}
-              />
-              <Text
+              /> */}
+              {/* <Text
                 size={300}
                 style={{
                   color: "#605E5C",
@@ -444,9 +452,9 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
               >
                 Connect to access your {app.name.replace("Microsoft ", "")}{" "}
                 files and enable AI commands
-              </Text>
+              </Text> */}
 
-              <div
+              {/* <div
                 style={{
                   fontSize: "11px",
                   color: "#8A8886",
@@ -482,8 +490,16 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
                 <Text size={200} style={{ display: "block" }}>
                   ✓ Real-time synchronization
                 </Text>
-              </div>
-            </div> */}
+                {app.type === "excel" && (
+                  <Text
+                    size={200}
+                    style={{ display: "block", marginTop: "4px" }}
+                  >
+                    ✓ Side-by-side file comparison
+                  </Text>
+                )}
+              </div> */}
+            </div>
 
             <div style={{ width: "100%" }}>
               <Button
@@ -535,489 +551,527 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
   // Use real documents when available, fallback to mock data
   const recentItems = getRealDocumentsForApp();
   const fallbackItems = getMockPreviewData(app.type);
-  const displayItems =
-    (recentItems.length > 0 ? recentItems : fallbackItems) || [];
+  const displayItems = recentItems.length > 0 ? recentItems : fallbackItems;
   const appSummary = getAppSummary() || app.summary;
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{
-        opacity: 1,
-        scale: 1,
-        ...getHighlightStyles(),
-      }}
-      whileHover={{ scale: 1.02 }}
-      style={{
-        width: isMinimized ? "250px" : embeddedDocument ? "600px" : "400px",
-        height: isMinimized ? "150px" : embeddedDocument ? "500px" : "320px",
-        cursor: isMinimized ? "pointer" : "default",
-        position: "relative",
-      }}
-      {...{ onClick: handleCardClick }}
-    >
-      {showDataFlow && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          style={{
-            position: "absolute",
-            top: "-10px",
-            left: "-10px",
-            right: "-10px",
-            bottom: "-10px",
-            borderRadius: "12px",
-            background: `linear-gradient(45deg, ${app.color}20, transparent, ${app.color}20)`,
-            backgroundSize: "200% 200%",
-            animation: "dataFlow 2s ease-in-out infinite",
-            zIndex: 0,
-            pointerEvents: "none",
-          }}
-        />
-      )}
-
-      {isHighlighted && (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          style={{
-            position: "absolute",
-            top: "8px",
-            right: "8px",
-            width: "12px",
-            height: "12px",
-            borderRadius: "50%",
-            backgroundColor: app.color,
-            zIndex: 10,
-            boxShadow: `0 0 10px ${app.color}`,
-            animation: "pulse 1.5s infinite",
-          }}
-        />
-      )}
-
-      {isMinimized && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          style={{
-            position: "absolute",
-            top: "8px",
-            right: "8px",
-            backgroundColor: `${app.color}`,
-            color: "white",
-            padding: "4px 8px",
-            borderRadius: "12px",
-            fontSize: "10px",
-            fontWeight: 600,
-            zIndex: 10,
-            boxShadow: `0 2px 4px ${app.color}40`,
-            border: `1px solid ${app.color}`,
-          }}
-        >
-          Click to expand
-        </motion.div>
-      )}
-
-      <Card
-        style={{
-          height: "100%",
-          border: `2px solid ${isHighlighted ? app.color : `${app.color}40`}`,
-          backgroundColor: isHighlighted ? `${app.color}12` : `${app.color}08`,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          position: "relative",
-          zIndex: 1,
-          transition: "all 0.3s ease",
+    <>
+      <motion.div
+        layout
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{
+          opacity: 1,
+          scale: 1,
           ...getHighlightStyles(),
         }}
+        whileHover={{ scale: 1.02 }}
+        style={{
+          width: isMinimized ? "250px" : embeddedDocument ? "600px" : "400px",
+          height: isMinimized ? "150px" : embeddedDocument ? "500px" : "320px",
+          cursor: isMinimized ? "pointer" : "default",
+          position: "relative",
+        }}
+        onClick={handleCardClick}
       >
-        <CardHeader
-          header={
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div style={{ color: app.color }}>
-                {getAppIcon(app.type, "20px")}
-              </div>
+        {showDataFlow && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: "absolute",
+              top: "-10px",
+              left: "-10px",
+              right: "-10px",
+              bottom: "-10px",
+              borderRadius: "12px",
+              background: `linear-gradient(45deg, ${app.color}20, transparent, ${app.color}20)`,
+              backgroundSize: "200% 200%",
+              animation: "dataFlow 2s ease-in-out infinite",
+              zIndex: 0,
+              pointerEvents: "none",
+            }}
+          />
+        )}
+
+        {isHighlighted && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            style={{
+              position: "absolute",
+              top: "8px",
+              right: "8px",
+              width: "12px",
+              height: "12px",
+              borderRadius: "50%",
+              backgroundColor: app.color,
+              zIndex: 10,
+              boxShadow: `0 0 10px ${app.color}`,
+              animation: "pulse 1.5s infinite",
+            }}
+          />
+        )}
+
+        {isMinimized && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            style={{
+              position: "absolute",
+              top: "8px",
+              right: "8px",
+              backgroundColor: `${app.color}`,
+              color: "white",
+              padding: "4px 8px",
+              borderRadius: "12px",
+              fontSize: "10px",
+              fontWeight: 600,
+              zIndex: 10,
+              boxShadow: `0 2px 4px ${app.color}40`,
+              border: `1px solid ${app.color}`,
+            }}
+          >
+            Click to expand
+          </motion.div>
+        )}
+
+        <Card
+          style={{
+            height: "100%",
+            border: `2px solid ${isHighlighted ? app.color : `${app.color}40`}`,
+            backgroundColor: isHighlighted
+              ? `${app.color}12`
+              : `${app.color}08`,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            position: "relative",
+            zIndex: 1,
+            transition: "all 0.3s ease",
+            ...getHighlightStyles(),
+          }}
+        >
+          <CardHeader
+            header={
               <div
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  paddingRight: isMinimized ? "100px" : "0",
-                }}
+                style={{ display: "flex", alignItems: "center", gap: "12px" }}
               >
-                <Text
-                  size={isMinimized ? 300 : 400}
-                  weight="semibold"
+                <div style={{ color: app.color }}>
+                  {getAppIcon(app.type, "20px")}
+                </div>
+                <div
                   style={{
-                    display: "block",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    flex: 1,
+                    minWidth: 0,
+                    paddingRight: isMinimized ? "100px" : "0",
                   }}
                 >
-                  {app.name}
-                </Text>
-                {app.lastActivity && !isMinimized && (
                   <Text
-                    size={200}
+                    size={isMinimized ? 300 : 400}
+                    weight="semibold"
                     style={{
-                      color: "#605E5C",
                       display: "block",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {app.lastActivity}
+                    {app.name}
                   </Text>
-                )}
-              </div>
-              {!isMinimized && (
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                >
-                  <Badge
-                    appearance="filled"
-                    color={isHighlighted ? "important" : "success"}
-                    size="small"
-                    style={{
-                      animation: isHighlighted ? "pulse 1.5s infinite" : "none",
-                    }}
-                  >
-                    {isHighlighted
-                      ? "Active"
-                      : documentsLoading
-                      ? "Loading..."
-                      : "Live"}
-                  </Badge>
-                  {embeddedDocument && (
-                    <Button
-                      appearance="subtle"
-                      size="small"
-                      icon={<DismissRegular />}
-                      onClick={(e: { stopPropagation: () => void }) => {
-                        e.stopPropagation();
-                        handleCloseEmbeddedDocument();
-                      }}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          }
-        />
-
-        <CardPreview
-          style={{
-            flex: 1,
-            padding: "12px 16px",
-            display: "flex",
-            flexDirection: "column",
-            minHeight: 0,
-            position: "relative",
-          }}
-        >
-          {embeddedDocument ? (
-            <EmbeddedDocumentEditor
-              documentId={embeddedDocument.id}
-              documentName={embeddedDocument.name}
-              appColor={app.color}
-              onClose={handleCloseEmbeddedDocument}
-              onSave={handleSaveDocument}
-            />
-          ) : isMinimized ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "100%",
-                textAlign: "center",
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  filter: "blur(8px)",
-                  opacity: 0.3,
-                  pointerEvents: "none",
-                  overflow: "hidden",
-                }}
-              >
-                {appSummary && (
-                  <div style={{ padding: "8px" }}>
+                  {app.lastActivity && !isMinimized && (
                     <Text
                       size={200}
-                      style={{ display: "block", marginBottom: "4px" }}
-                    >
-                      {appSummary.quickStats ||
-                        `${appSummary.totalFiles} files`}
-                    </Text>
-                    <Text size={100} style={{ color: "#605E5C" }}>
-                      {appSummary.recentActivity}
-                    </Text>
-                  </div>
-                )}
-
-                {displayItems[0] && (
-                  <div
-                    style={{
-                      padding: "6px",
-                      margin: "8px",
-                      backgroundColor: "rgba(255, 255, 255, 0.5)",
-                      borderRadius: "4px",
-                    }}
-                  >
-                    <Text size={100} style={{ display: "block" }}>
-                      {displayItems[0].name}
-                    </Text>
-                    <Text size={100} style={{ color: "#605E5C" }}>
-                      {displayItems[0].preview.substring(0, 30)}...
-                    </Text>
-                  </div>
-                )}
-              </div>
-
-              <div
-                style={{
-                  position: "relative",
-                  zIndex: 2,
-                  backgroundColor: "rgba(255, 255, 255, 0.95)",
-                  padding: "16px",
-                  borderRadius: "8px",
-                  border: `1px solid ${app.color}30`,
-                  backdropFilter: "blur(10px)",
-                  boxShadow: `0 4px 12px ${app.color}20`,
-                }}
-              >
-                <div style={{ color: app.color, marginBottom: "8px" }}>
-                  {getAppIcon(app.type, "32px")}
-                </div>
-                <Text
-                  size={400}
-                  weight="semibold"
-                  style={{
-                    display: "block",
-                    color: "#323130",
-                    marginBottom: "4px",
-                  }}
-                >
-                  {app.name.replace("Microsoft ", "")}
-                </Text>
-                <Text
-                  size={200}
-                  style={{
-                    color: "#605E5C",
-                    display: "block",
-                  }}
-                >
-                  {appSummary?.totalFiles || 0} files •{" "}
-                  {app.lastActivity || "Active"}
-                </Text>
-              </div>
-            </div>
-          ) : (
-            <div
-              style={{
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                minHeight: 0,
-              }}
-            >
-              <Text
-                size={300}
-                weight="semibold"
-                style={{ marginBottom: "12px", display: "block" }}
-              >
-                {documentsLoading ? "Loading Documents..." : "Recent Activity"}
-              </Text>
-
-              {documentsLoading ? (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flex: 1,
-                  }}
-                >
-                  <Spinner size="medium" />
-                </div>
-              ) : (
-                <div
-                  style={{
-                    flex: 1,
-                    overflowY: "auto",
-                    minHeight: 0,
-                    paddingRight: "4px",
-                  }}
-                >
-                  {displayItems.length === 0 ? (
-                    <div
                       style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        height: "100%",
-                        textAlign: "center",
-                        padding: "20px",
+                        color: "#605E5C",
+                        display: "block",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      <div style={{ color: app.color, marginBottom: "12px" }}>
-                        {getAppIcon(app.type, "32px")}
-                      </div>
-                      <Text
-                        size={300}
-                        style={{ color: "#605E5C", marginBottom: "8px" }}
-                      >
-                        No {app.name.replace("Microsoft ", "")} documents found
-                      </Text>
-                      <Text size={200} style={{ color: "#8A8886" }}>
-                        Create your first document to see it here
-                      </Text>
-                    </div>
-                  ) : (
-                    displayItems.slice(0, 3).map((item, index) => (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        style={{
-                          padding: "8px",
-                          marginBottom: "8px",
-                          backgroundColor: isHighlighted
-                            ? `${app.color}20`
-                            : "rgba(255, 255, 255, 0.8)",
-                          borderRadius: "6px",
-                          border: `1px solid ${app.color}${
-                            isHighlighted ? "60" : "20"
-                          }`,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          transition: "all 0.3s ease",
-                          cursor: "pointer",
-                        }}
-                        onClick={(
-                          e: React.MouseEvent<HTMLDivElement, MouseEvent>
-                        ) => handleDocumentClick(item.id, item.name, e)}
-                        whileHover={{ scale: 1.02 }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <Text
-                            size={200}
-                            weight="semibold"
-                            style={{ display: "block" }}
-                          >
-                            {item.name}
-                          </Text>
-                          <Text
-                            size={100}
-                            style={{ color: "#605E5C", display: "block" }}
-                          >
-                            {item.preview}
-                          </Text>
-                          <Text
-                            size={100}
-                            style={{ color: "#888", display: "block" }}
-                          >
-                            {item.lastModified}
-                          </Text>
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                          }}
-                        >
-                          {(app.type === "word" || app.type === "onenote") && (
-                            <EditRegular
-                              style={{ fontSize: "12px", color: app.color }}
-                            />
-                          )}
-                          <ChevronRightRegular
-                            style={{ fontSize: "12px", color: "#605E5C" }}
-                          />
-                        </div>
-                      </motion.div>
-                    ))
+                      {app.lastActivity}
+                    </Text>
                   )}
                 </div>
-              )}
-            </div>
-          )}
-        </CardPreview>
+                {!isMinimized && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <Badge
+                      appearance="filled"
+                      color={isHighlighted ? "important" : "success"}
+                      size="small"
+                      style={{
+                        animation: isHighlighted
+                          ? "pulse 1.5s infinite"
+                          : "none",
+                      }}
+                    >
+                      {isHighlighted
+                        ? "Active"
+                        : documentsLoading
+                        ? "Loading..."
+                        : "Live"}
+                    </Badge>
+                    {embeddedDocument && (
+                      <Button
+                        appearance="subtle"
+                        size="small"
+                        icon={<DismissRegular />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCloseEmbeddedDocument();
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            }
+          />
 
-        {!embeddedDocument && !isMinimized && (
-          <div
+          <CardPreview
             style={{
-              padding: "8px 16px",
-              borderTop: `1px solid ${app.color}20`,
+              flex: 1,
+              padding: "12px 16px",
               display: "flex",
-              gap: "8px",
-              justifyContent: "space-between",
-              backgroundColor: "rgba(255, 255, 255, 0.9)",
-              backdropFilter: "blur(4px)",
-              flexShrink: 0,
+              flexDirection: "column",
+              minHeight: 0,
+              position: "relative",
             }}
           >
-            <Button
-              appearance="subtle"
-              size="small"
-              icon={<MaximizeRegular />}
-              onClick={(e: { stopPropagation: () => void }) => {
-                e.stopPropagation();
-                onToggleSize();
-              }}
-            >
-              Minimize
-            </Button>
+            {embeddedDocument ? (
+              <EmbeddedDocumentEditor
+                documentId={embeddedDocument.id}
+                documentName={embeddedDocument.name}
+                appColor={app.color}
+                onClose={handleCloseEmbeddedDocument}
+                onSave={handleSaveDocument}
+              />
+            ) : isMinimized ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  textAlign: "center",
+                  position: "relative",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    filter: "blur(8px)",
+                    opacity: 0.3,
+                    pointerEvents: "none",
+                    overflow: "hidden",
+                  }}
+                >
+                  {appSummary && (
+                    <div style={{ padding: "8px" }}>
+                      <Text
+                        size={200}
+                        style={{ display: "block", marginBottom: "4px" }}
+                      >
+                        {appSummary.quickStats ||
+                          `${appSummary.totalFiles} files`}
+                      </Text>
+                      <Text size={100} style={{ color: "#605E5C" }}>
+                        {appSummary.recentActivity}
+                      </Text>
+                    </div>
+                  )}
 
-            <Button
-              appearance="primary"
-              size="small"
-              icon={<OpenRegular />}
-              onClick={(e: { stopPropagation: () => void }) => {
-                e.stopPropagation();
-                onOpenInTab();
+                  {displayItems[0] && (
+                    <div
+                      style={{
+                        padding: "6px",
+                        margin: "8px",
+                        backgroundColor: "rgba(255, 255, 255, 0.5)",
+                        borderRadius: "4px",
+                      }}
+                    >
+                      <Text size={100} style={{ display: "block" }}>
+                        {displayItems[0].name}
+                      </Text>
+                      <Text size={100} style={{ color: "#605E5C" }}>
+                        {displayItems[0].preview.substring(0, 30)}...
+                      </Text>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    position: "relative",
+                    zIndex: 2,
+                    backgroundColor: "rgba(255, 255, 255, 0.95)",
+                    padding: "16px",
+                    borderRadius: "8px",
+                    border: `1px solid ${app.color}30`,
+                    backdropFilter: "blur(10px)",
+                    boxShadow: `0 4px 12px ${app.color}20`,
+                  }}
+                >
+                  <div style={{ color: app.color, marginBottom: "8px" }}>
+                    {getAppIcon(app.type, "32px")}
+                  </div>
+                  <Text
+                    size={400}
+                    weight="semibold"
+                    style={{
+                      display: "block",
+                      color: "#323130",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    {app.name.replace("Microsoft ", "")}
+                  </Text>
+                  <Text
+                    size={200}
+                    style={{
+                      color: "#605E5C",
+                      display: "block",
+                    }}
+                  >
+                    {appSummary?.totalFiles || 0} files •{" "}
+                    {app.lastActivity || "Active"}
+                  </Text>
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  minHeight: 0,
+                }}
+              >
+                <Text
+                  size={300}
+                  weight="semibold"
+                  style={{ marginBottom: "12px", display: "block" }}
+                >
+                  {documentsLoading
+                    ? "Loading Documents..."
+                    : "Recent Activity"}
+                </Text>
+
+                {documentsLoading ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flex: 1,
+                    }}
+                  >
+                    <Spinner size="medium" />
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      flex: 1,
+                      overflowY: "auto",
+                      minHeight: 0,
+                      paddingRight: "4px",
+                    }}
+                  >
+                    {displayItems.length === 0 ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          height: "100%",
+                          textAlign: "center",
+                          padding: "20px",
+                        }}
+                      >
+                        <div style={{ color: app.color, marginBottom: "12px" }}>
+                          {getAppIcon(app.type, "32px")}
+                        </div>
+                        <Text
+                          size={300}
+                          style={{ color: "#605E5C", marginBottom: "8px" }}
+                        >
+                          No {app.name.replace("Microsoft ", "")} documents
+                          found
+                        </Text>
+                        <Text size={200} style={{ color: "#8A8886" }}>
+                          Create your first document to see it here
+                        </Text>
+                      </div>
+                    ) : (
+                      displayItems.slice(0, 3).map((item, index) => (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          style={{
+                            padding: "8px",
+                            marginBottom: "8px",
+                            backgroundColor: isHighlighted
+                              ? `${app.color}20`
+                              : "rgba(255, 255, 255, 0.8)",
+                            borderRadius: "6px",
+                            border: `1px solid ${app.color}${
+                              isHighlighted ? "60" : "20"
+                            }`,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            transition: "all 0.3s ease",
+                            cursor: "pointer",
+                          }}
+                          onClick={(e) =>
+                            handleDocumentClick(item.id, item.name, e)
+                          }
+                          whileHover={{ scale: 1.02 }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <Text
+                              size={200}
+                              weight="semibold"
+                              style={{ display: "block" }}
+                            >
+                              {item.name}
+                            </Text>
+                            <Text
+                              size={100}
+                              style={{ color: "#605E5C", display: "block" }}
+                            >
+                              {item.preview}
+                            </Text>
+                            <Text
+                              size={100}
+                              style={{ color: "#888", display: "block" }}
+                            >
+                              {item.lastModified}
+                            </Text>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            {(app.type === "word" ||
+                              app.type === "onenote") && (
+                              <EditRegular
+                                style={{ fontSize: "12px", color: app.color }}
+                              />
+                            )}
+                            <ChevronRightRegular
+                              style={{ fontSize: "12px", color: "#605E5C" }}
+                            />
+                          </div>
+                        </motion.div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardPreview>
+
+          {!embeddedDocument && !isMinimized && (
+            <div
+              style={{
+                padding: "8px 16px",
+                borderTop: `1px solid ${app.color}20`,
+                display: "flex",
+                gap: "8px",
+                justifyContent: "space-between",
+                backgroundColor: "rgba(255, 255, 255, 0.9)",
+                backdropFilter: "blur(4px)",
+                flexShrink: 0,
               }}
-              style={{ backgroundColor: app.color, border: "none" }}
             >
-              Open App
-            </Button>
-          </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <Button
+                  appearance="subtle"
+                  size="small"
+                  icon={<MaximizeRegular />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleSize();
+                  }}
+                >
+                  Minimize
+                </Button>
+
+                {app.type === "excel" && (
+                  <Button
+                    appearance="subtle"
+                    size="small"
+                    icon={<ArrowSwapRegular />}
+                    onClick={handleExcelComparison}
+                  >
+                    0
+                  </Button>
+                )}
+              </div>
+
+              <Button
+                appearance="primary"
+                size="small"
+                icon={<OpenRegular />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenInTab();
+                }}
+                style={{ backgroundColor: app.color, border: "none" }}
+              >
+                Open App
+              </Button>
+            </div>
+          )}
+        </Card>
+
+        <style>{`
+          @keyframes dataFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+          
+          @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+          }
+
+          @keyframes highlightPulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+          }
+        `}</style>
+      </motion.div>
+
+      {/* Excel Comparison Modal */}
+      <AnimatePresence>
+        {showExcelComparison && (
+          <ExcelComparison
+            isOpen={showExcelComparison}
+            onClose={() => setShowExcelComparison(false)}
+          />
         )}
-      </Card>
-
-      <style>{`
-        @keyframes dataFlow {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(1.1); }
-        }
-
-        @keyframes highlightPulse {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 1; }
-        }
-      `}</style>
-    </motion.div>
+      </AnimatePresence>
+    </>
   );
 };
