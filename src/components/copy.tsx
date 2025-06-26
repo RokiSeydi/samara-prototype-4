@@ -20,12 +20,17 @@ import {
   NotebookRegular,
   MailRegular,
   PeopleRegular,
+  CheckmarkCircleRegular,
+  ErrorCircleRegular,
+  PlugConnectedRegular,
+  PlugDisconnectedRegular,
+  WarningRegular,
   OpenRegular,
   MaximizeRegular,
-  PlugConnectedRegular,
+  ChevronRightRegular,
   EditRegular,
   DismissRegular,
-  ArrowSwapRegular,
+  CompareRegular,
   ArrowClockwiseRegular,
   MoreHorizontalRegular,
   ShareRegular,
@@ -67,7 +72,7 @@ interface AppWidgetProps {
   onConnect: () => void;
   isHighlighted?: boolean;
   highlightIntensity?: "low" | "medium" | "high";
-  onRefresh?: () => void;
+  onRefresh?: () => void; // NEW: Refresh callback
 }
 
 const getAppIcon = (type: string, size = "24px") => {
@@ -217,10 +222,11 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
   app,
   isMinimized,
   onToggleSize,
+  onOpenInTab,
   onConnect,
   isHighlighted = false,
   highlightIntensity = "medium",
-  onRefresh,
+  onRefresh, // NEW: Refresh prop
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showDataFlow, setShowDataFlow] = useState(false);
@@ -235,6 +241,7 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
   // MSAL for authenticated file access
   const { instance, accounts } = useMsal();
 
+  // Get real documents from Graph API
   const { documents, loading: documentsLoading, refetch } = useGraphData();
 
   useEffect(() => {
@@ -336,23 +343,22 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
         // Get access token for authenticated access
         if (accounts.length > 0) {
           try {
-            // You can still acquire the token for API calls if needed, but don't use it in the URL
-            await instance.acquireTokenSilent({
+            const response = await instance.acquireTokenSilent({
               ...loginRequest,
               account: accounts[0],
             });
 
-            // Open the document directly
-            window.open(webUrl, "_blank");
+            // Create authenticated URL with access token
+            const authenticatedUrl = `${webUrl}?access_token=${response.accessToken}`;
+
+            console.log("✅ Opening with authenticated URL");
+            window.open(authenticatedUrl, "_blank");
             return;
           } catch (error) {
             console.warn(
               "⚠️ Token acquisition failed, trying alternative methods:",
               error
             );
-            // Fallback: Try direct URL (might prompt for login)
-            window.open(webUrl, "_blank");
-            return;
           }
         }
 
@@ -385,12 +391,12 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
 
           // Create authenticated URLs for each app
           const authenticatedUrls = {
-            excel: "https://m365.cloud.microsoft/launch/Excel",
-            word: "https://m365.cloud.microsoft/launch/Word",
-            powerpoint: "https://m365.cloud.microsoft/launch/PowerPoint",
-            onenote: "https://m365.cloud.microsoft/launch/OneNote",
-            outlook: "https://outlook.office.com/mail/",
-            teams: "https://teams.microsoft.com/",
+            excel: `https://office.live.com/start/Excel.aspx?auth_upn=${accounts[0].username}&access_token=${response.accessToken}`,
+            word: `https://office.live.com/start/Word.aspx?auth_upn=${accounts[0].username}&access_token=${response.accessToken}`,
+            powerpoint: `https://office.live.com/start/PowerPoint.aspx?auth_upn=${accounts[0].username}&access_token=${response.accessToken}`,
+            onenote: `https://www.onenote.com/notebooks?auth_upn=${accounts[0].username}&access_token=${response.accessToken}`,
+            outlook: `https://outlook.live.com/mail/?auth_upn=${accounts[0].username}&access_token=${response.accessToken}`,
+            teams: `https://teams.microsoft.com/?auth_upn=${accounts[0].username}&access_token=${response.accessToken}`,
           };
 
           const authenticatedUrl = authenticatedUrls[app.type];
@@ -402,6 +408,22 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
         } catch (error) {
           console.warn("⚠️ Token acquisition failed for app opening:", error);
         }
+      }
+
+      // Fallback: Use standard URLs (might prompt for login)
+      const standardUrls = {
+        excel: "https://office.live.com/start/Excel.aspx",
+        word: "https://office.live.com/start/Word.aspx",
+        powerpoint: "https://office.live.com/start/PowerPoint.aspx",
+        onenote: "https://www.onenote.com/notebooks",
+        outlook: "https://outlook.live.com",
+        teams: "https://teams.microsoft.com",
+      };
+
+      const standardUrl = standardUrls[app.type];
+      if (standardUrl) {
+        console.log("🔄 Fallback: Opening standard app URL");
+        window.open(standardUrl, "_blank");
       }
     } catch (error) {
       console.error("❌ Failed to open app:", error);
@@ -574,9 +596,84 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
               justifyContent: "space-between",
               alignItems: "center",
               textAlign: "center",
-              // minHeight: "200px",
+              minHeight: "200px",
             }}
           >
+            <div style={{ marginBottom: "20px", width: "100%" }}>
+              <PlugConnectedRegular
+                style={{
+                  fontSize: "32px",
+                  color: "#C8C6C4",
+                  marginBottom: "12px",
+                  display: "block",
+                }}
+              />
+              <Text
+                size={300}
+                style={{
+                  color: "#605E5C",
+                  lineHeight: "1.4",
+                  display: "block",
+                  marginBottom: "16px",
+                }}
+              >
+                Connect to access your {app.name.replace("Microsoft ", "")}{" "}
+                files and enable AI commands
+              </Text>
+
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "#8A8886",
+                  textAlign: "left",
+                  backgroundColor: "rgba(255, 255, 255, 0.7)",
+                  padding: "12px",
+                  borderRadius: "6px",
+                  border: `1px solid ${app.color}20`,
+                }}
+              >
+                <Text
+                  size={200}
+                  style={{
+                    display: "block",
+                    marginBottom: "6px",
+                    fontWeight: 600,
+                  }}
+                >
+                  What you'll get:
+                </Text>
+                <Text
+                  size={200}
+                  style={{ display: "block", marginBottom: "4px" }}
+                >
+                  ✓ Live document previews
+                </Text>
+                <Text
+                  size={200}
+                  style={{ display: "block", marginBottom: "4px" }}
+                >
+                  ✓ AI-powered commands
+                </Text>
+                <Text size={200} style={{ display: "block" }}>
+                  ✓ Real-time synchronization
+                </Text>
+                <Text size={200} style={{ display: "block", marginTop: "4px" }}>
+                  ✓ Direct file access without re-login
+                </Text>
+                {app.type === "excel" && (
+                  <Text
+                    size={200}
+                    style={{ display: "block", marginTop: "4px" }}
+                  >
+                    ✓ Side-by-side file comparison
+                  </Text>
+                )}
+                <Text size={200} style={{ display: "block", marginTop: "4px" }}>
+                  ✓ Refresh to see latest documents
+                </Text>
+              </div>
+            </div>
+
             <div style={{ width: "100%" }}>
               <Button
                 appearance="primary"
@@ -803,7 +900,7 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
                     >
                       {isHighlighted
                         ? "Active"
-                        : documentsLoading
+                        : documentsLoading || isRefreshing
                         ? "Loading..."
                         : "Live"}
                     </Badge>
@@ -948,43 +1045,54 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
                   minHeight: 0,
                 }}
               >
-                <Text
-                  size={300}
-                  weight="semibold"
-                  style={{ marginBottom: "12px", display: "block" }}
-                >
-                  {documentsLoading
-                    ? "Loading Documents..."
-                    : "Recent Activity"}
-                </Text>
-                {/* NEW: Refresh Button */}
-                <Button
-                  appearance="subtle"
-                  size="small"
-                  icon={
-                    isRefreshing ? (
-                      <Spinner size="tiny" />
-                    ) : (
-                      <ArrowClockwiseRegular />
-                    )
-                  }
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
+                <div
                   style={{
-                    minWidth: "auto",
-                    padding: "4px 8px",
-                    color: app.color,
-                    border: `1px solid ${app.color}40`,
-                    borderRadius: "4px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "12px",
                   }}
-                  title={
-                    isRefreshing
-                      ? "Refreshing..."
-                      : "Refresh to see latest documents"
-                  }
                 >
-                  {isRefreshing ? "Refreshing..." : "Refresh"}
-                </Button>
+                  <Text
+                    size={300}
+                    weight="semibold"
+                    style={{ display: "block" }}
+                  >
+                    {documentsLoading || isRefreshing
+                      ? "Loading Documents..."
+                      : "Recent Activity"}
+                  </Text>
+
+                  {/* NEW: Refresh Button */}
+                  <Button
+                    appearance="subtle"
+                    size="small"
+                    icon={
+                      isRefreshing ? (
+                        <Spinner size="tiny" />
+                      ) : (
+                        <ArrowClockwiseRegular />
+                      )
+                    }
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    style={{
+                      minWidth: "auto",
+                      padding: "4px 8px",
+                      color: app.color,
+                      border: `1px solid ${app.color}40`,
+                      borderRadius: "4px",
+                    }}
+                    title={
+                      isRefreshing
+                        ? "Refreshing..."
+                        : "Refresh to see latest documents"
+                    }
+                  >
+                    {isRefreshing ? "Refreshing..." : "Refresh"}
+                  </Button>
+                </div>
+
                 {documentsLoading || isRefreshing ? (
                   <div
                     style={{
@@ -1211,7 +1319,7 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
                     <MenuList>
                       {app.type === "excel" && (
                         <MenuItem
-                          icon={<ArrowSwapRegular />}
+                          icon={<CompareRegular />}
                           onClick={handleExcelComparison}
                         >
                           Compare Files
@@ -1253,22 +1361,22 @@ export const AppWidget: React.FC<AppWidgetProps> = ({
         </Card>
 
         <style>{`
-                  @keyframes dataFlow {
-                    0% { background-position: 0% 50%; }
-                    50% { background-position: 100% 50%; }
-                    100% { background-position: 0% 50%; }
-                  }
-                  
-                  @keyframes pulse {
-                    0%, 100% { opacity: 1; transform: scale(1); }
-                    50% { opacity: 0.7; transform: scale(1.1); }
-                  }
-        
-                  @keyframes highlightPulse {
-                    0%, 100% { opacity: 0.6; }
-                    50% { opacity: 1; }
-                  }
-                `}</style>
+          @keyframes dataFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+          
+          @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+          }
+
+          @keyframes highlightPulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+          }
+        `}</style>
       </motion.div>
 
       {/* Excel Comparison Modal */}

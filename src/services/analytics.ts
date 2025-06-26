@@ -57,7 +57,7 @@ class AnalyticsService {
   // Authorized user configuration
   private readonly AUTHORIZED_USER = {
     name: "Roki Seydi",
-    email: "roky.seydi@gmail.com",
+    email: "rokiseydi@samarahub.onmicrosoft.com",
   };
 
   constructor() {

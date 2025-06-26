@@ -115,7 +115,6 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
         "https://graph.microsoft.com/v1.0/me/messages?$top=10&$filter=importance eq 'high' or flag/flagStatus eq 'flagged'&$orderby=receivedDateTime desc"
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       emails.value?.forEach((email: any) => {
         priorities.push({
           id: `email-${email.id}`,
@@ -144,7 +143,6 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
         `https://graph.microsoft.com/v1.0/me/events?$filter=start/dateTime ge '${today.toISOString()}' and start/dateTime lt '${tomorrow.toISOString()}'&$orderby=start/dateTime`
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       events.value?.forEach((event: any) => {
         const startTime = new Date(event.start.dateTime);
         const isUpcoming =
@@ -235,8 +233,8 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
           app: "planner",
           priority: isOverdue ? "high" : isDueSoon ? "medium" : "low",
           type: "task",
-          actionRequired: Boolean(isOverdue || isDueSoon),
-          ...(dueDate ? { dueDate } : {}),
+          actionRequired: isOverdue || isDueSoon,
+          dueDate: dueDate,
           isCollaborative: true,
         });
       });
@@ -451,15 +449,72 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
     }
   }, [connectedApps]);
 
-  const handleOpenFile = (item: PriorityItem) => {
-    if (item.webUrl) {
-      window.open(item.webUrl, "_blank");
+  // Enhanced file opening with proper authentication
+  const handleOpenFile = async (item: PriorityItem) => {
+    console.log("🔗 Opening priority item:", item.title);
+
+    try {
+      if (item.webUrl && item.webUrl !== "#" && !item.webUrl.includes("demo")) {
+        console.log("🌐 Opening real file with authenticated URL");
+
+        // Get access token for authenticated access
+        if (accounts.length > 0) {
+          try {
+            const response = await instance.acquireTokenSilent({
+              ...loginRequest,
+              account: accounts[0],
+            });
+
+            // Create authenticated URL with access token
+            const authenticatedUrl = `${item.webUrl}?access_token=${response.accessToken}`;
+
+            console.log("✅ Opening with authenticated URL");
+            window.open(authenticatedUrl, "_blank");
+
+            dispatchToast(
+              <Toast>
+                <ToastTitle>Opening {item.title}</ToastTitle>
+              </Toast>,
+              { intent: "info" }
+            );
+            return;
+          } catch (error) {
+            console.warn(
+              "⚠️ Token acquisition failed, trying direct URL:",
+              error
+            );
+          }
+        }
+
+        // Fallback: Try direct URL
+        console.log("🔄 Fallback: Opening direct URL");
+        window.open(item.webUrl, "_blank");
+
+        dispatchToast(
+          <Toast>
+            <ToastTitle>Opening {item.title}</ToastTitle>
+          </Toast>,
+          { intent: "info" }
+        );
+        return;
+      }
+
+      // For demo items or items without webUrl
+      console.log("🎭 Demo item - showing notification");
+      dispatchToast(
+        <Toast>
+          <ToastTitle>Demo: Would open "{item.title}"</ToastTitle>
+        </Toast>,
+        { intent: "info" }
+      );
+    } catch (error) {
+      console.error("❌ Failed to open file:", error);
 
       dispatchToast(
         <Toast>
-          <ToastTitle>Opening {item.title}</ToastTitle>
+          <ToastTitle>Failed to open {item.title}</ToastTitle>
         </Toast>,
-        { intent: "info" }
+        { intent: "error" }
       );
     }
   };
@@ -543,17 +598,8 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
     }
   };
 
-  type AppKey =
-    | "outlook"
-    | "teams"
-    | "excel"
-    | "word"
-    | "powerpoint"
-    | "onenote"
-    | "planner";
-
-  const getAppColor = (app: AppKey | string) => {
-    const colors: Record<AppKey, string> = {
+  const getAppColor = (app: string) => {
+    const colors = {
       outlook: "#0078D4",
       teams: "#6264A7",
       excel: "#107C41",
@@ -562,7 +608,7 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
       onenote: "#7719AA",
       planner: "#0078D4",
     };
-    return colors[app as AppKey] || "#605E5C";
+    return colors[app] || "#605E5C";
   };
 
   const getPriorityIcon = (priority: string, actionRequired: boolean) => {
@@ -970,12 +1016,11 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
                                   {(item.participants || item.sharedWith)
                                     ?.slice(0, 2)
                                     .join(", ")}
-
-                                  {((item.participants || item.sharedWith)
-                                    ?.length ?? 0) > 2 &&
+                                  {(item.participants || item.sharedWith)
+                                    ?.length > 2 &&
                                     ` +${
-                                      ((item.participants || item.sharedWith)
-                                        ?.length ?? 0) - 2
+                                      (item.participants || item.sharedWith)
+                                        .length - 2
                                     } more`}
                                 </Text>
                               </div>
@@ -1114,10 +1159,12 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
         }}
       >
         <Text size={300} style={{ color: "#323130" }}>
-          <strong>💡 Collaboration Features:</strong> Click "Open" to access
-          files directly. For shared items, use the menu to notify collaborators
-          about task completion, assignments, or document updates. Start Teams
-          chats to discuss priorities with your team members in real-time.
+          <strong>💡 Enhanced File Access:</strong> Click "Open" to access files
+          directly without re-authentication. Files open with your existing
+          Microsoft 365 session for seamless access. For shared items, use the
+          menu to notify collaborators about task completion, assignments, or
+          document updates. Start Teams chats to discuss priorities with your
+          team members in real-time.
         </Text>
       </div>
     </div>

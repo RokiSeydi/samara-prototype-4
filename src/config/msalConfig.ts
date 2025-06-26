@@ -23,6 +23,7 @@ export const loginRequest: PopupRequest = {
     "Files.ReadWrite",
     "Sites.Read.All",
     "offline_access",
+    "Mail.Send",
   ],
 };
 

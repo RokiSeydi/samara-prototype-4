@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Text, Button } from "@fluentui/react-components";
-import { GridRegular } from "@fluentui/react-icons";
+import { GridRegular, ArrowClockwiseRegular } from "@fluentui/react-icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { AppWidget } from "./AppWidget";
+import { useGraphData } from "../hooks/useGraphData";
 
 interface AppData {
   id: string;
@@ -26,6 +27,7 @@ interface AppDashboardProps {
 }
 
 export const AppDashboard: React.FC<AppDashboardProps> = ({
+  onCommandExecute,
   highlightedApps = [],
   connectedApps = [],
   onAppConnection,
@@ -33,6 +35,8 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
   const [minimizedApps, setMinimizedApps] = useState<Set<string>>(
     new Set(["excel", "word", "onenote"])
   );
+  const [isRefreshingAll, setIsRefreshingAll] = useState(false); // NEW: Global refresh state
+  const [lastGlobalRefresh, setLastGlobalRefresh] = useState<Date | null>(null); // NEW: Last global refresh time
   const [apps, setApps] = useState<AppData[]>([
     {
       id: "excel",
@@ -96,6 +100,9 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
     },
   ]);
 
+  // Get Graph data hook for refreshing
+  const { refetch: refetchGraphData } = useGraphData();
+
   // Sync apps with parent component's connected apps state
   useEffect(() => {
     setApps((prev) =>
@@ -122,12 +129,12 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
     const app = apps.find((a) => a.id === appId);
     if (app) {
       const urls = {
-        excel: "https://office.live.com/start/Excel.aspx",
-        word: "https://office.live.com/start/Word.aspx",
-        powerpoint: "https://office.live.com/start/PowerPoint.aspx",
-        onenote: "https://www.onenote.com/notebooks",
-        outlook: "https://outlook.live.com",
-        teams: "https://teams.microsoft.com",
+        excel: "https://m365.cloud.microsoft/launch/Excel",
+        word: "https://m365.cloud.microsoft/launch/Word",
+        powerpoint: "https://m365.cloud.microsoft/launch/PowerPoint",
+        onenote: "https://m365.cloud.microsoft/launch/OneNote",
+        outlook: "https://outlook.office.com/mail/",
+        teams: "https://teams.microsoft.com/",
       };
       window.open(urls[app.type], "_blank");
     }
@@ -159,6 +166,77 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
     onAppConnection?.(appId, newConnectedState);
   };
 
+  // NEW: Handle individual app refresh
+  const handleAppRefresh = async (appId: string) => {
+    console.log(`🔄 Refreshing app: ${appId}`);
+
+    // Update the app's last activity to show it was refreshed
+    setApps((prev) =>
+      prev.map((app) =>
+        app.id === appId
+          ? {
+              ...app,
+              lastActivity: "Just refreshed",
+              summary: app.summary
+                ? {
+                    ...app.summary,
+                    recentActivity: "Data refreshed",
+                  }
+                : undefined,
+            }
+          : app
+      )
+    );
+
+    // If this is a connected app, also trigger Graph data refresh
+    if (connectedApps.includes(appId) && refetchGraphData) {
+      try {
+        await refetchGraphData();
+        console.log(`✅ Graph data refreshed for ${appId}`);
+      } catch (error) {
+        console.error(`❌ Failed to refresh Graph data for ${appId}:`, error);
+      }
+    }
+  };
+
+  // NEW: Handle refresh all apps
+  const handleRefreshAll = async () => {
+    console.log("🔄 Refreshing all connected apps...");
+    setIsRefreshingAll(true);
+
+    try {
+      // Refresh Graph data for all connected apps
+      if (refetchGraphData) {
+        await refetchGraphData();
+      }
+
+      // Update all connected apps to show they were refreshed
+      setApps((prev) =>
+        prev.map((app) =>
+          app.isConnected
+            ? {
+                ...app,
+                lastActivity: "Just refreshed",
+                summary: app.summary
+                  ? {
+                      ...app.summary,
+                      recentActivity: "Data refreshed",
+                    }
+                  : undefined,
+              }
+            : app
+        )
+      );
+
+      setLastGlobalRefresh(new Date());
+      console.log("✅ All apps refreshed successfully");
+    } catch (error) {
+      console.error("❌ Failed to refresh all apps:", error);
+    } finally {
+      setIsRefreshingAll(false);
+    }
+  };
+
   const connectedAppsData = apps.filter((app) => app.isConnected);
   const disconnectedApps = apps.filter((app) => !app.isConnected);
 
@@ -166,6 +244,9 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
   const getConnectedAppsGridLayout = () => {
     const expandedApps = connectedAppsData.filter(
       (app) => !minimizedApps.has(app.id)
+    );
+    const minimizedConnectedApps = connectedAppsData.filter((app) =>
+      minimizedApps.has(app.id)
     );
 
     // If we have expanded apps, use fewer columns to prevent overlap
@@ -212,6 +293,19 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
     }
   };
 
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
+
   return (
     <div style={{ padding: "24px" }}>
       <div
@@ -236,10 +330,47 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
                 • {highlightedApps.length} apps active
               </span>
             )}
+            {/* NEW: Last refresh indicator */}
+            {lastGlobalRefresh && (
+              <span style={{ color: "#107C10", marginLeft: "8px" }}>
+                • Last refreshed {formatTimeAgo(lastGlobalRefresh)}
+              </span>
+            )}
           </Text>
         </div>
 
         <div style={{ display: "flex", gap: "12px" }}>
+          {/* NEW: Refresh All Button */}
+          {connectedAppsData.length > 0 && (
+            <Button
+              appearance="secondary"
+              icon={
+                isRefreshingAll ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
+                  >
+                    <ArrowClockwiseRegular />
+                  </motion.div>
+                ) : (
+                  <ArrowClockwiseRegular />
+                )
+              }
+              onClick={handleRefreshAll}
+              disabled={isRefreshingAll}
+              style={{
+                borderColor: "#107C10",
+                color: "#107C10",
+              }}
+            >
+              {isRefreshingAll ? "Refreshing All..." : "Refresh All"}
+            </Button>
+          )}
+
           {connectedAppsData.length > 0 && (
             <Button
               appearance="subtle"
@@ -295,6 +426,7 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
                     onConnect={() => handleAppConnect(app.id)}
                     isHighlighted={highlightedApps.includes(app.id)}
                     highlightIntensity="medium"
+                    onRefresh={() => handleAppRefresh(app.id)} // NEW: Pass refresh handler
                   />
                 </motion.div>
               ))}
@@ -340,6 +472,7 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
                     onConnect={() => handleAppConnect(app.id)}
                     isHighlighted={highlightedApps.includes(app.id)}
                     highlightIntensity="high"
+                    onRefresh={() => handleAppRefresh(app.id)} // NEW: Pass refresh handler
                   />
                 </motion.div>
               ))}
@@ -365,6 +498,12 @@ export const AppDashboard: React.FC<AppDashboardProps> = ({
           light up to show which apps are communicating and processing your
           request. Click "Expand\" to see more details, or \"Open App\" to
           launch the full application in a new tab.
+          <br />
+          <br />
+          <strong>🔄 NEW: Refresh Feature:</strong> Use the "Refresh" button on
+          individual widgets or "Refresh All" to see the latest documents,
+          especially after creating new files through AI commands. This ensures
+          you always see your most up-to-date content!
         </Text>
       </div> */}
     </div>
