@@ -455,39 +455,9 @@ export const PriorityDashboard: React.FC<PriorityDashboardProps> = ({
 
     try {
       if (item.webUrl && item.webUrl !== "#" && !item.webUrl.includes("demo")) {
-        console.log("🌐 Opening real file with authenticated URL");
+        console.log("🌐 Opening real file with direct URL");
 
-        // Get access token for authenticated access
-        if (accounts.length > 0) {
-          try {
-            const response = await instance.acquireTokenSilent({
-              ...loginRequest,
-              account: accounts[0],
-            });
-
-            // Create authenticated URL with access token
-            const authenticatedUrl = `${item.webUrl}?access_token=${response.accessToken}`;
-
-            console.log("✅ Opening with authenticated URL");
-            window.open(authenticatedUrl, "_blank");
-
-            dispatchToast(
-              <Toast>
-                <ToastTitle>Opening {item.title}</ToastTitle>
-              </Toast>,
-              { intent: "info" }
-            );
-            return;
-          } catch (error) {
-            console.warn(
-              "⚠️ Token acquisition failed, trying direct URL:",
-              error
-            );
-          }
-        }
-
-        // Fallback: Try direct URL
-        console.log("🔄 Fallback: Opening direct URL");
+        // Open the document directly (no token in URL)
         window.open(item.webUrl, "_blank");
 
         dispatchToast(
